@@ -6,6 +6,10 @@ use tauri::{
 
 const INJECT: &str = include_str!("inject.js");
 const PREFIX: &str = "overlay-";
+/// Kleinste erlaubte Fenstergröße (physische Pixel, Breite und Höhe).
+pub const MIN_SIZE: u32 = 200;
+/// Zoom-Grenzen von WebView2.
+const ZOOM_RANGE: (f64, f64) = (0.25, 5.0);
 
 fn es<E: ToString>(e: E) -> String {
     e.to_string()
@@ -23,10 +27,23 @@ pub fn id_from_label(label: &str) -> Option<i64> {
     label.strip_prefix(PREFIX)?.parse().ok()
 }
 
+/// Zoomfaktor, bei dem eine Seite mit Referenzgröße `base` in ein Fenster `w × h` passt.
+fn zoom_factor(w: u32, h: u32, base: (u32, u32)) -> f64 {
+    (w as f64 / base.0.max(1) as f64)
+        .min(h as f64 / base.1.max(1) as f64)
+        .clamp(ZOOM_RANGE.0, ZOOM_RANGE.1)
+}
+
 /// JS, das beim Dokumentstart in jeden Frame injiziert wird
 /// (Audio, Transparenz, farbiger Rahmen, Verschiebe-/Skalier-Bedienelemente, Stumm-Symbol).
 fn init_script(ov: &Overlay) -> String {
+    let zoom = zoom_factor(
+        ov.width.max(MIN_SIZE),
+        ov.height.max(MIN_SIZE),
+        (ov.base_width, ov.base_height),
+    );
     INJECT
+        .replace("__ZOOM__", &zoom.to_string())
         .replace("__VOLUME__", &ov.volume.to_string())
         .replace("__MUTED__", &ov.muted.to_string())
         .replace("__TRANSPARENT__", &ov.transparent_bg.to_string())
@@ -76,6 +93,45 @@ pub fn forget(app: &AppHandle, label: &str) {
         if let Ok(mut s) = state.maximized.lock() {
             s.remove(&id);
         };
+        if let Ok(mut b) = state.bases.lock() {
+            b.remove(&id);
+        };
+    }
+}
+
+/// Referenzgröße im Speicher ablegen, damit Resize-Events ohne DB-Zugriff den Zoom berechnen.
+pub fn remember_base(app: &AppHandle, ov: &Overlay) {
+    if let Ok(mut b) = app.state::<AppState>().bases.lock() {
+        b.insert(ov.id, (ov.base_width.max(1), ov.base_height.max(1)));
+    }
+}
+
+/// Seite so zoomen, dass sie bei jeder Fenstergröße komplett sichtbar ist:
+/// Referenzgröße = 100 %, sonst das kleinere der beiden Seitenverhältnisse.
+pub fn apply_zoom(win: &WebviewWindow) {
+    let Some(id) = id_from_label(win.label()) else { return };
+    let Ok(size) = win.inner_size() else { return };
+    if size.width == 0 || size.height == 0 {
+        return;
+    }
+    let base = win
+        .app_handle()
+        .state::<AppState>()
+        .bases
+        .lock()
+        .ok()
+        .and_then(|b| b.get(&id).copied());
+    let Some((bw, bh)) = base else { return };
+    let zoom = zoom_factor(size.width, size.height, (bw, bh));
+    let _ = win.set_zoom(zoom);
+    // Bedienelemente/Rahmen in der Seite bleiben unabhängig vom Zoom in Originalgröße.
+    let _ = win.eval(format!("window.__overlaySetZoom&&window.__overlaySetZoom({zoom})"));
+}
+
+/// Für Window-Events (Resized): Zoom des zugehörigen Overlay-Fensters aktualisieren.
+pub fn apply_zoom_for(window: &Window) {
+    if let Some(win) = window.app_handle().get_webview_window(window.label()) {
+        apply_zoom(&win);
     }
 }
 
@@ -90,6 +146,7 @@ pub fn open(app: &AppHandle, ov: &Overlay) -> Result<(), String> {
 
     let url: tauri::Url = ov.url.parse().map_err(|e| format!("Ungültige URL: {e}"))?;
     let id = ov.id;
+    remember_base(app, ov);
 
     let win = WebviewWindowBuilder::new(app, &label, WebviewUrl::External(url))
         .title(ov.name.clone())
@@ -101,7 +158,8 @@ pub fn open(app: &AppHandle, ov: &Overlay) -> Result<(), String> {
         .skip_taskbar(true)
         .minimizable(false)
         .maximizable(false)
-        .min_inner_size(120.0, 60.0)
+        .devtools(cfg!(debug_assertions)) // nur im Entwicklungsmodus Entwicklerwerkzeuge
+        .min_inner_size(MIN_SIZE as f64, MIN_SIZE as f64)
         .visible(false) // erst nach Positionierung anzeigen
         .focused(false)
         .initialization_script(init_script(ov))
@@ -118,11 +176,16 @@ pub fn open(app: &AppHandle, ov: &Overlay) -> Result<(), String> {
                 if let Some(ov) = current {
                     let _ = w.eval(config_js(&ov));
                 }
+                if let Some(win) = app.get_webview_window(&self::label(id)) {
+                    apply_zoom(&win);
+                }
             }
         })
         .build()
         .map_err(es)?;
 
+    // Mindestgröße exakt in physischen Pixeln (unabhängig von der Skalierung).
+    let _ = win.set_min_size(Some(PhysicalSize::new(MIN_SIZE, MIN_SIZE)));
     place(&win, ov);
     apply_mode(&win, ov)?;
     // Zuletzt maximierte Overlays starten wieder maximiert (nur gesperrt möglich).
@@ -151,10 +214,11 @@ pub fn apply_mode(win: &WebviewWindow, ov: &Overlay) -> Result<(), String> {
 
 /// Setzt Position und Größe (physische Pixel).
 pub fn place(win: &WebviewWindow, ov: &Overlay) {
-    let _ = win.set_size(PhysicalSize::new(ov.width, ov.height));
+    let _ = win.set_size(PhysicalSize::new(ov.width.max(MIN_SIZE), ov.height.max(MIN_SIZE)));
     // Falls Windows einen unsichtbaren Rand liefert, Client-Fläche exakt auf x/y ausrichten.
     let (dx, dy) = client_offset(win);
     let _ = win.set_position(PhysicalPosition::new(ov.x - dx, ov.y - dy));
+    apply_zoom(win);
 }
 
 /// Abstand zwischen Außenposition des Fensters und Beginn der Webview-Fläche.
@@ -193,11 +257,13 @@ pub fn set_maximized(win: &WebviewWindow, ov: &Overlay, on: bool) -> Result<(), 
 
 /// Gespeicherte Einstellungen live auf ein offenes Fenster anwenden (ohne Neuladen).
 pub fn sync(win: &WebviewWindow, ov: &Overlay) -> Result<(), String> {
+    remember_base(win.app_handle(), ov);
     win.set_title(&ov.name).map_err(es)?;
     apply_mode(win, ov)?;
     if !is_maximized(win.app_handle(), ov.id) {
         place(win, ov);
     }
+    apply_zoom(win);
     Ok(())
 }
 
@@ -220,7 +286,7 @@ pub fn persist_geometry(window: &Window) {
     }
     let Some(id) = id_from_label(window.label()) else { return };
     let (Ok(p), Ok(s)) = (window.inner_position(), window.inner_size()) else { return };
-    if p.x < -10_000 || p.y < -10_000 || s.width == 0 || s.height == 0 {
+    if p.x < -10_000 || p.y < -10_000 || s.width < MIN_SIZE || s.height < MIN_SIZE {
         return;
     }
     let app = window.app_handle();

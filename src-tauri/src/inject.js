@@ -12,6 +12,7 @@
     muteIcon: __MUTE_ICON__,
     name: __NAME__,
     label: __LABEL__,
+    zoom: __ZOOM__,
   };
   const isTop = window.top === window;
   const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
@@ -125,13 +126,22 @@
          display:none;align-items:center;justify-content:center;pointer-events:none}
     .mute.edit{top:38px}`;
   let ui = null;
+  // Rahmen, Balken, Anfasser und Symbol gehören zum Fenster, nicht zur Seite: Der
+  // WebView-Zoom wird hier gegengerechnet, damit sie immer in Originalgröße erscheinen.
+  function layoutHost(host) {
+    const z = cfg.zoom > 0 ? cfg.zoom : 1;
+    host.style.width = 100 * z + "vw";
+    host.style.height = 100 * z + "vh";
+    host.style.transform = "scale(" + 1 / z + ")";
+  }
   function ensureUi() {
     if (!isTop) return null;
     const root = document.documentElement;
     if (!root) return null;
     if (!ui) {
       const host = document.createElement("div");
-      host.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;z-index:2147483647;pointer-events:none;display:none;";
+      host.style.cssText = "position:fixed;top:0;left:0;transform-origin:0 0;z-index:2147483647;pointer-events:none;display:none;";
+      layoutHost(host);
       const sh = host.attachShadow({ mode: "closed" });
       try {
         const sheet = new CSSStyleSheet();
@@ -213,6 +223,10 @@
   }
 
   window.__overlayConfig = (c) => { Object.assign(cfg, c); apply(); };
+  window.__overlaySetZoom = (z) => {
+    cfg.zoom = Number(z) || 1;
+    if (ui) layoutHost(ui.host);
+  };
   window.addEventListener("message", (e) => {
     const d = e.data;
     if (d && d.__overlayCfg && window.parent !== window && e.source === window.parent) {

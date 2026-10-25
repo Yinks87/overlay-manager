@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+const MIN_SIZE = 200; // entspricht overlay::MIN_SIZE im Backend
+
 const pick = (o) => ({
   name: o.name,
   url: o.url,
@@ -41,6 +43,7 @@ export default function OverlayEditor({
   onMaximize,
   onAudio,
   onLocked,
+  onSetReference,
 }) {
   const [draft, setDraft] = useState(() => pick(overlay));
   const [dirty, setDirty] = useState(false);
@@ -65,8 +68,8 @@ export default function OverlayEditor({
       ...draft,
       x: Number(draft.x) || 0,
       y: Number(draft.y) || 0,
-      width: Math.max(50, Number(draft.width) || 0),
-      height: Math.max(50, Number(draft.height) || 0),
+      width: Math.max(MIN_SIZE, Number(draft.width) || 0),
+      height: Math.max(MIN_SIZE, Number(draft.height) || 0),
       // „Live“-Werte kommen direkt vom gespeicherten Overlay:
       locked: overlay.locked,
       volume: overlay.volume,
@@ -77,6 +80,9 @@ export default function OverlayEditor({
   }
 
   const percent = Math.round(overlay.volume * 100);
+  const zoomPercent = Math.round(
+    Math.min(Math.max(Math.min(overlay.width / overlay.baseWidth, overlay.height / overlay.baseHeight), 0.25), 5) * 100
+  );
 
   return (
     <div className="editor">
@@ -148,11 +154,28 @@ export default function OverlayEditor({
           ].map(([key, label]) => (
             <label className="field" key={key}>
               <span>{label}</span>
-              <input type="number" value={draft[key]} onChange={num(key)} />
+              <input
+                type="number"
+                value={draft[key]}
+                min={key === "width" || key === "height" ? MIN_SIZE : undefined}
+                onChange={num(key)}
+              />
             </label>
           ))}
         </div>
-        <p className="hint">Angaben in Bildschirmpixeln.</p>
+        <p className="hint">Angaben in Bildschirmpixeln. Mindestgröße: {MIN_SIZE} × {MIN_SIZE}.</p>
+        <div className="zoom-row">
+          <span className="switch-text">
+            <span className="switch-label">Zoom: {zoomPercent} %</span>
+            <span className="hint">
+              Die Seite wird so skaliert, dass sie bei jeder Fenstergröße komplett sichtbar ist.
+              100 % gilt bei der Referenzgröße {overlay.baseWidth} × {overlay.baseHeight}.
+            </span>
+          </span>
+          <button className="btn small" onClick={onSetReference}>
+            Aktuelle Größe = 100 %
+          </button>
+        </div>
         <Switch
           label="Farbigen Rahmen anzeigen"
           hint="Markiert die Position des Overlays auf dem Bildschirm. Im Bearbeitungsmodus ist der Rahmen immer sichtbar."

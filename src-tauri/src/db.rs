@@ -20,10 +20,29 @@ pub struct Overlay {
     pub border_enabled: bool,
     pub border_color: String,
     pub mute_indicator: bool,
-    /// Zuletzt gespeicherter Maximiert-Zustand (wird beim Öffnen wiederhergestellt).
     pub maximized: bool,
-    /// Aktiviert = Overlay war zuletzt geöffnet und startet mit der App.
     pub enabled: bool,
+    pub base_width: u32,
+    pub base_height: u32,
+    pub group_id: Option<i64>,
+    pub position: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Group {
+    pub id: i64,
+    pub name: String,
+    pub position: i64,
+    pub collapsed: bool,
+}
+
+/// Eintrag der Listenstruktur: Overlay auf oberster Ebene oder Gruppe mit ihren Overlays.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum LayoutItem {
+    Overlay { id: i64 },
+    Group { id: i64, children: Vec<i64> },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -53,7 +72,7 @@ pub struct DashboardGeometry {
     pub height: u32,
 }
 
-const OVERLAY_COLS: &str = "id,name,url,x,y,width,height,locked,volume,muted,transparent_bg,border_enabled,border_color,mute_indicator,maximized,enabled";
+const OVERLAY_COLS: &str = "id,name,url,x,y,width,height,locked,volume,muted,transparent_bg,border_enabled,border_color,mute_indicator,maximized,enabled,base_width,base_height,group_id,position";
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     let conn = Connection::open(path)?;
@@ -77,7 +96,18 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
             border_color   TEXT    NOT NULL DEFAULT '#ff3b6b',
             mute_indicator INTEGER NOT NULL DEFAULT 0,
             maximized      INTEGER NOT NULL DEFAULT 0,
-            enabled        INTEGER NOT NULL DEFAULT 0
+            enabled        INTEGER NOT NULL DEFAULT 0,
+            base_width     INTEGER NOT NULL DEFAULT 640,
+            base_height    INTEGER NOT NULL DEFAULT 360,
+            group_id       INTEGER,
+            position       INTEGER NOT NULL DEFAULT 0
+         );
+
+         CREATE TABLE IF NOT EXISTS groups (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            name      TEXT    NOT NULL,
+            position  INTEGER NOT NULL DEFAULT 0,
+            collapsed INTEGER NOT NULL DEFAULT 0
          );
          
          CREATE TABLE IF NOT EXISTS app_settings (
@@ -88,7 +118,9 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
             size_width     INTEGER NOT NULL DEFAULT 800,
             size_height    INTEGER NOT NULL DEFAULT 600,
             close_behavior TEXT    NOT NULL DEFAULT 'exit',
-            dashboard_saved INTEGER NOT NULL DEFAULT 0
+            dashboard_saved INTEGER NOT NULL DEFAULT 0,
+            auto_check_updates   INTEGER NOT NULL DEFAULT 0,
+            auto_install_updates INTEGER NOT NULL DEFAULT 0
          );",
     )?;
     // Migration für Datenbanken aus älteren Versionen (Fehler = Spalte existiert schon).
@@ -103,13 +135,24 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     }
     // „enabled“ löst das frühere „autostart“ ab; bestehende Werte werden einmalig übernommen.
     if conn
-        .execute("ALTER TABLE overlays ADD COLUMN enabled INTEGER NOT NULL DEFAULT 0", [])
+        .execute(
+            "ALTER TABLE overlays ADD COLUMN enabled INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
         .is_ok()
     {
         let _ = conn.execute("UPDATE overlays SET enabled = autostart", []);
     }
     let _ = conn.execute(
         "ALTER TABLE app_settings ADD COLUMN close_behavior TEXT NOT NULL DEFAULT 'exit'",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE app_settings ADD COLUMN auto_check_updates INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE app_settings ADD COLUMN auto_install_updates INTEGER NOT NULL DEFAULT 0",
         [],
     );
     // Bereits gespeicherte Dashboard-Geometrie (Zeile existiert) bleibt gültig.
@@ -122,6 +165,40 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     {
         let _ = conn.execute("UPDATE app_settings SET dashboard_saved = 1", []);
     }
+    // Referenzgröße für den Zoom: bestehende Overlays behalten ihre aktuelle Größe als 100 %.
+    if conn
+        .execute(
+            "ALTER TABLE overlays ADD COLUMN base_width INTEGER NOT NULL DEFAULT 640",
+            [],
+        )
+        .is_ok()
+    {
+        let _ = conn.execute(
+            "ALTER TABLE overlays ADD COLUMN base_height INTEGER NOT NULL DEFAULT 360",
+            [],
+        );
+        let _ = conn.execute(
+            "UPDATE overlays SET base_width = width, base_height = height",
+            [],
+        );
+    }
+    // Gruppen: bestehende Overlays behalten ihre bisherige Reihenfolge (nach id).
+    let _ = conn.execute("ALTER TABLE overlays ADD COLUMN group_id INTEGER", []);
+    if conn
+        .execute(
+            "ALTER TABLE overlays ADD COLUMN position INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .is_ok()
+    {
+        let _ = conn.execute("UPDATE overlays SET position = id", []);
+    }
+    // Mindestgröße der Overlay-Fenster (siehe overlay::MIN_SIZE).
+    conn.execute(
+        "UPDATE overlays SET width = MAX(width, 200), height = MAX(height, 200),
+                base_width = MAX(base_width, 200), base_height = MAX(base_height, 200)",
+        [],
+    )?;
     // Es gibt genau eine Einstellungs-Zeile.
     conn.execute(
         "INSERT INTO app_settings (theme) SELECT 'light' WHERE NOT EXISTS (SELECT 1 FROM app_settings)",
@@ -148,11 +225,17 @@ fn map(r: &Row) -> rusqlite::Result<Overlay> {
         mute_indicator: r.get(13)?,
         maximized: r.get(14)?,
         enabled: r.get(15)?,
+        base_width: r.get(16)?,
+        base_height: r.get(17)?,
+        group_id: r.get(18)?,
+        position: r.get(19)?,
     })
 }
 
 pub fn list(c: &Connection) -> rusqlite::Result<Vec<Overlay>> {
-    let mut st = c.prepare(&format!("SELECT {OVERLAY_COLS} FROM overlays ORDER BY id"))?;
+    let mut st = c.prepare(&format!(
+        "SELECT {OVERLAY_COLS} FROM overlays ORDER BY position, id"
+    ))?;
     let rows = st.query_map([], map)?;
     rows.collect()
 }
@@ -166,11 +249,23 @@ pub fn get(c: &Connection, id: i64) -> rusqlite::Result<Option<Overlay>> {
     .optional()
 }
 
+/// Nächste freie Position auf der obersten Ebene (Overlays ohne Gruppe und Gruppen teilen sich die Zählung).
+fn next_root_position(c: &Connection) -> rusqlite::Result<i64> {
+    c.query_row(
+        "SELECT COALESCE(MAX(p), -1) + 1 FROM
+           (SELECT position AS p FROM overlays WHERE group_id IS NULL
+            UNION ALL SELECT position FROM groups)",
+        [],
+        |r| r.get(0),
+    )
+}
+
 pub fn insert(c: &Connection, i: &OverlayInput) -> rusqlite::Result<i64> {
+    let position = next_root_position(c)?;
     c.execute(
-        "INSERT INTO overlays (name,url,x,y,width,height,locked,volume,muted,transparent_bg,border_enabled,border_color,mute_indicator)
-         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
-        params![i.name, i.url, i.x, i.y, i.width, i.height, i.locked, i.volume, i.muted, i.transparent_bg, i.border_enabled, i.border_color, i.mute_indicator],
+        "INSERT INTO overlays (name,url,x,y,width,height,locked,volume,muted,transparent_bg,border_enabled,border_color,mute_indicator,base_width,base_height,position)
+         VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?5,?6,?14)",
+        params![i.name, i.url, i.x, i.y, i.width, i.height, i.locked, i.volume, i.muted, i.transparent_bg, i.border_enabled, i.border_color, i.mute_indicator, position],
     )?;
     Ok(c.last_insert_rowid())
 }
@@ -236,6 +331,14 @@ pub fn set_enabled(c: &Connection, id: i64, enabled: bool) -> rusqlite::Result<(
     Ok(())
 }
 
+pub fn set_base_size(c: &Connection, id: i64, w: u32, h: u32) -> rusqlite::Result<()> {
+    c.execute(
+        "UPDATE overlays SET base_width=?2,base_height=?3 WHERE id=?1",
+        params![id, w, h],
+    )?;
+    Ok(())
+}
+
 /// `None`, solange noch nie eine Dashboard-Geometrie gespeichert wurde.
 pub fn get_dashboard_geometry(c: &Connection) -> rusqlite::Result<Option<DashboardGeometry>> {
     c.query_row(
@@ -269,17 +372,181 @@ pub const CLOSE_MINIMIZE: &str = "minimize";
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     pub close_behavior: String,
+    pub auto_check_updates: bool,
+    pub auto_install_updates: bool,
 }
 
 pub fn get_app_settings(c: &Connection) -> rusqlite::Result<AppSettings> {
-    let close_behavior = c
-        .query_row("SELECT close_behavior FROM app_settings LIMIT 1", [], |r| r.get(0))
-        .optional()?
-        .unwrap_or_else(|| CLOSE_EXIT.to_string());
-    Ok(AppSettings { close_behavior })
+    let settings = c
+        .query_row(
+            "SELECT close_behavior,auto_check_updates,auto_install_updates FROM app_settings LIMIT 1",
+            [],
+            |r| {
+                Ok(AppSettings {
+                    close_behavior: r.get(0)?,
+                    auto_check_updates: r.get(1)?,
+                    auto_install_updates: r.get(2)?,
+                })
+            },
+        )
+        .optional()?;
+    Ok(settings.unwrap_or(AppSettings {
+        close_behavior: CLOSE_EXIT.to_string(),
+        auto_check_updates: false,
+        auto_install_updates: false,
+    }))
 }
 
 pub fn set_close_behavior(c: &Connection, behavior: &str) -> rusqlite::Result<()> {
     c.execute("UPDATE app_settings SET close_behavior=?1", [behavior])?;
     Ok(())
+}
+
+pub fn set_update_settings(
+    c: &Connection,
+    auto_check: bool,
+    auto_install: bool,
+) -> rusqlite::Result<()> {
+    c.execute(
+        "UPDATE app_settings SET auto_check_updates=?1,auto_install_updates=?2",
+        params![auto_check, auto_install],
+    )?;
+    Ok(())
+}
+
+// ── Gruppen ──
+
+pub fn list_groups(c: &Connection) -> rusqlite::Result<Vec<Group>> {
+    let mut st =
+        c.prepare("SELECT id,name,position,collapsed FROM groups ORDER BY position, id")?;
+    let rows = st.query_map([], |r| {
+        Ok(Group {
+            id: r.get(0)?,
+            name: r.get(1)?,
+            position: r.get(2)?,
+            collapsed: r.get(3)?,
+        })
+    })?;
+    rows.collect()
+}
+
+pub fn get_group(c: &Connection, id: i64) -> rusqlite::Result<Option<Group>> {
+    c.query_row(
+        "SELECT id,name,position,collapsed FROM groups WHERE id=?1",
+        [id],
+        |r| {
+            Ok(Group {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                position: r.get(2)?,
+                collapsed: r.get(3)?,
+            })
+        },
+    )
+    .optional()
+}
+
+pub fn insert_group(c: &Connection, name: &str) -> rusqlite::Result<i64> {
+    let position = next_root_position(c)?;
+    c.execute(
+        "INSERT INTO groups (name,position) VALUES (?1,?2)",
+        params![name, position],
+    )?;
+    Ok(c.last_insert_rowid())
+}
+
+pub fn rename_group(c: &Connection, id: i64, name: &str) -> rusqlite::Result<()> {
+    c.execute("UPDATE groups SET name=?2 WHERE id=?1", params![id, name])?;
+    Ok(())
+}
+
+pub fn set_group_collapsed(c: &Connection, id: i64, collapsed: bool) -> rusqlite::Result<()> {
+    c.execute(
+        "UPDATE groups SET collapsed=?2 WHERE id=?1",
+        params![id, collapsed],
+    )?;
+    Ok(())
+}
+
+/// Löscht die Gruppe; ihre Overlays bleiben erhalten und rücken an ihre Stelle auf die oberste Ebene.
+pub fn delete_group(c: &Connection, id: i64) -> rusqlite::Result<()> {
+    let tx = c.unchecked_transaction()?;
+    // (position, ist_gruppe, id) der obersten Ebene in aktueller Reihenfolge
+    let mut root: Vec<(i64, bool, i64)> = Vec::new();
+    {
+        let mut st = tx.prepare("SELECT position,id FROM overlays WHERE group_id IS NULL")?;
+        for row in st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))? {
+            let (p, oid) = row?;
+            root.push((p, false, oid));
+        }
+        let mut st = tx.prepare("SELECT position,id FROM groups")?;
+        for row in st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))? {
+            let (p, gid) = row?;
+            root.push((p, true, gid));
+        }
+    }
+    root.sort();
+    let mut children: Vec<i64> = Vec::new();
+    {
+        let mut st =
+            tx.prepare("SELECT id FROM overlays WHERE group_id=?1 ORDER BY position, id")?;
+        for row in st.query_map([id], |r| r.get::<_, i64>(0))? {
+            children.push(row?);
+        }
+    }
+    let mut pos = 0i64;
+    for (_, is_group, item_id) in root {
+        if is_group && item_id == id {
+            for child in &children {
+                tx.execute(
+                    "UPDATE overlays SET group_id=NULL, position=?2 WHERE id=?1",
+                    params![child, pos],
+                )?;
+                pos += 1;
+            }
+        } else if is_group {
+            tx.execute(
+                "UPDATE groups SET position=?2 WHERE id=?1",
+                params![item_id, pos],
+            )?;
+            pos += 1;
+        } else {
+            tx.execute(
+                "UPDATE overlays SET position=?2 WHERE id=?1",
+                params![item_id, pos],
+            )?;
+            pos += 1;
+        }
+    }
+    tx.execute("DELETE FROM groups WHERE id=?1", [id])?;
+    tx.commit()
+}
+
+/// Speichert die komplette Listenstruktur (Reihenfolge und Gruppenzugehörigkeit).
+pub fn save_layout(c: &Connection, layout: &[LayoutItem]) -> rusqlite::Result<()> {
+    let tx = c.unchecked_transaction()?;
+    for (index, item) in layout.iter().enumerate() {
+        let index = index as i64;
+        match item {
+            LayoutItem::Overlay { id } => {
+                tx.execute(
+                    "UPDATE overlays SET group_id=NULL, position=?2 WHERE id=?1",
+                    params![id, index],
+                )?;
+            }
+            LayoutItem::Group { id, children } => {
+                tx.execute(
+                    "UPDATE groups SET position=?2 WHERE id=?1",
+                    params![id, index],
+                )?;
+                for (child_index, child) in children.iter().enumerate() {
+                    tx.execute(
+                        "UPDATE overlays SET group_id=?2, position=?3 WHERE id=?1",
+                        params![child, id, child_index as i64],
+                    )?;
+                }
+            }
+        }
+    }
+    tx.commit()
 }

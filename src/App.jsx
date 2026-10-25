@@ -1,100 +1,94 @@
 import { useState } from "react";
 import { useOverlays } from "./hooks/useOverlays";
-import OverlayList from "./components/OverlayList";
-import OverlayEditor from "./components/OverlayEditor";
-import ScreenMap from "./components/ScreenMap";
+import DashboardPage from "./components/DashboardPage";
+import OverlaysPage from "./components/OverlaysPage";
 import SettingsPage from "./components/SettingsPage";
+import { useStartupUpdate } from "./hooks/useStartupUpdate";
 import "./App.css";
+
+const PAGES = [
+  { id: "dashboard", label: "Dashboard" },
+  { id: "overlays", label: "Overlays" },
+  { id: "settings", label: "Einstellungen" },
+];
 
 export default function App() {
   const o = useOverlays();
+  const startupUpdate = useStartupUpdate();
+  const [page, setPage] = useState("dashboard");
   const [selectedId, setSelectedId] = useState(null);
-  const [showSettings, setShowSettings] = useState(false);
-  const selected = o.overlays.find((x) => x.id === selectedId) ?? null;
 
-  function handleSelect(id) {
+  // Auswahl (z. B. aus der Monitorübersicht) öffnet die Overlay-Seite mit dem Overlay.
+  function openOverlayPage(id) {
     setSelectedId(id);
-    setShowSettings(false);
-  }
-
-  async function handleCreate() {
-    const created = await o.create();
-    if (created) handleSelect(created.id);
-  }
-
-  async function handleDelete(id) {
-    await o.remove(id);
-    setSelectedId(null);
+    setPage("overlays");
   }
 
   return (
     <div className="app">
       <aside className="sidebar">
-        <header className="sidebar-head">
-          <h1>Overlays</h1>
-          <button className="btn primary" onClick={handleCreate}>
-            Neues Overlay
-          </button>
-        </header>
-
-        <OverlayList
-          overlays={o.overlays}
-          openIds={o.openIds}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-          onToggle={o.toggleOpen}
-          maximizedIds={o.maximizedIds}
-          onMaximize={o.toggleMaximized}
-        />
-
-        <ScreenMap
-          overlays={o.overlays}
-          openIds={o.openIds}
-          selectedId={selectedId}
-          onSelect={handleSelect}
-        />
-
-        <button
-          className={showSettings ? "btn settings-btn active" : "btn settings-btn"}
-          onClick={() => setShowSettings(true)}
-        >
-          Einstellungen
-        </button>
+        <h1 className="brand">Overlay Manager</h1>
+        <nav className="nav" aria-label="Hauptmenü">
+          {PAGES.map((p) => (
+            <button
+              key={p.id}
+              className={page === p.id ? "nav-btn active" : "nav-btn"}
+              aria-current={page === p.id ? "page" : undefined}
+              onClick={() => setPage(p.id)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </nav>
       </aside>
 
       <main className="stage">
-        {o.error && (
-          <div className="banner" role="alert">
-            <span>{o.error}</span>
-            <button className="btn ghost" onClick={() => o.setError(null)}>
-              Schließen
-            </button>
+        {(startupUpdate.installing || startupUpdate.available || o.error) && (
+          <div className="banners">
+            {startupUpdate.installing && (
+              <div className="banner info" role="status">
+                <span>Update wird heruntergeladen und installiert … Die App startet gleich neu.</span>
+              </div>
+            )}
+            {startupUpdate.available && (
+              <div className="banner info" role="status">
+                <span>Version {startupUpdate.available} ist verfügbar.</span>
+                <span className="banner-actions">
+                  <button className="btn" onClick={() => setPage("settings")}>
+                    Zu den Einstellungen
+                  </button>
+                  <button className="btn ghost" onClick={startupUpdate.dismiss}>
+                    Später
+                  </button>
+                </span>
+              </div>
+            )}
+            {o.error && (
+              <div className="banner" role="alert">
+                <span>{o.error}</span>
+                <button className="btn ghost" onClick={() => o.setError(null)}>
+                  Schließen
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {showSettings ? (
-          <SettingsPage onError={o.setError} />
-        ) : selected ? (
-          <OverlayEditor
-            key={selected.id}
-            overlay={selected}
-            isOpen={o.openIds.includes(selected.id)}
-            onSave={(input) => o.save(selected.id, input)}
-            onDelete={() => handleDelete(selected.id)}
-            onToggleOpen={() => o.toggleOpen(selected.id)}
-            isMaximized={o.maximizedIds.includes(selected.id)}
-            onMaximize={() => o.toggleMaximized(selected.id)}
-            onAudio={(v, m) => o.setAudio(selected.id, v, m)}
-            onLocked={(l) => o.setLocked(selected.id, l)}
-          />
-        ) : (
-          <div className="empty">
-            <h2>{o.overlays.length ? "Overlay auswählen" : "Noch kein Overlay angelegt"}</h2>
-            <p>
-              {o.overlays.length
-                ? "Wähle links ein Overlay oder in der Bildschirmübersicht ein Rechteck."
-                : "Lege ein Overlay an, trage eine URL ein und öffne es als eigenes, durchklickbares Fenster."}
-            </p>
+        {page === "dashboard" && (
+          <div className="page">
+            <DashboardPage
+              overlays={o.overlays}
+              openIds={o.openIds}
+              selectedId={selectedId}
+              onSelect={openOverlayPage}
+              onSetOpen={o.setOpen}
+            />
+          </div>
+        )}
+        {page === "overlays" && <OverlaysPage o={o} selectedId={selectedId} onSelect={setSelectedId} />}
+        {page === "settings" && (
+          <div className="page">
+            <SettingsPage onError={o.setError} />
           </div>
         )}
       </main>

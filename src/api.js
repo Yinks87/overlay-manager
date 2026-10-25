@@ -13,8 +13,18 @@ export const api = {
   closeOverlay: (id) => invoke("close_overlay", { id }),
   setLocked: (id, locked) => invoke("set_overlay_locked", { id, locked }),
   setAudio: (id, volume, muted) => invoke("set_overlay_audio", { id, volume, muted }),
+  setReference: (id) => invoke("set_overlay_reference", { id }),
+  listGroups: () => invoke("list_groups"),
+  createGroup: (name) => invoke("create_group", { name }),
+  renameGroup: (id, name) => invoke("rename_group", { id, name }),
+  setGroupCollapsed: (id, collapsed) => invoke("set_group_collapsed", { id, collapsed }),
+  deleteGroup: (id) => invoke("delete_group", { id }),
+  saveLayout: (layout) => invoke("save_layout", { layout }),
+  setOverlaysOpen: (ids, open) => invoke("set_overlays_open", { ids, open }),
   getAppSettings: () => invoke("get_app_settings"),
   setCloseBehavior: (behavior) => invoke("set_close_behavior", { behavior }),
+  setUpdateSettings: (autoCheck, autoInstall) =>
+    invoke("set_update_settings", { autoCheck, autoInstall }),
 };
 
 export const NEW_OVERLAY = {

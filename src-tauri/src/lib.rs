@@ -2,7 +2,10 @@ mod commands;
 mod db;
 mod overlay;
 
-use std::{collections::HashSet, sync::Mutex};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+};
 use tauri::{Emitter, Manager, WindowEvent};
 
 /// Geteilter App-Zustand. WICHTIG: Den DB-Lock nie halten, während Fenster-APIs
@@ -12,6 +15,8 @@ pub struct AppState {
     pub db: Mutex<rusqlite::Connection>,
     /// IDs der Overlays, die gerade auf Monitorgröße maximiert sind.
     pub maximized: Mutex<HashSet<i64>>,
+    /// Referenzgröße (100 % Zoom) der geöffneten Overlays: id → (Breite, Höhe).
+    pub bases: Mutex<HashMap<i64, (u32, u32)>>,
 }
 
 const DASHBOARD_MIN: (u32, u32) = (860, 560);
@@ -123,6 +128,24 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+/// Das Hauptfenster wird aus der Konfiguration (`create: false`) im Code erzeugt,
+/// damit die Entwicklerwerkzeuge im Release-Build sicher deaktiviert sind.
+fn create_main_window(app: &tauri::App) -> tauri::Result<()> {
+    let mut config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .ok_or(tauri::Error::WindowNotFound)?;
+    if !cfg!(debug_assertions) {
+        config.devtools = Some(false);
+    }
+    tauri::WebviewWindowBuilder::from_config(app, &config)?.build()?;
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         // Muss als erstes Plugin registriert werden: zweiter Start holt das Dashboard nach vorn.
@@ -132,6 +155,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            create_main_window(app)?;
             build_tray(app)?;
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
@@ -146,6 +170,7 @@ pub fn run() {
             app.manage(AppState {
                 db: Mutex::new(conn),
                 maximized: Mutex::new(HashSet::new()),
+                bases: Mutex::new(HashMap::new()),
             });
 
             if let (Some(g), Some(main)) = (dashboard, app.get_webview_window("main")) {
@@ -180,6 +205,9 @@ pub fn run() {
                 WindowEvent::Moved(_) | WindowEvent::Resized(_)
                     if overlay::id_from_label(&label).is_some() =>
                 {
+                    if matches!(event, WindowEvent::Resized(_)) {
+                        overlay::apply_zoom_for(window);
+                    }
                     overlay::persist_geometry(window);
                 }
                 WindowEvent::Destroyed if overlay::id_from_label(&label).is_some() => {
@@ -201,7 +229,16 @@ pub fn run() {
             commands::set_overlay_audio,
             commands::get_maximized_overlays,
             commands::get_app_settings,
+            commands::set_overlay_reference,
+            commands::list_groups,
+            commands::create_group,
+            commands::rename_group,
+            commands::set_group_collapsed,
+            commands::delete_group,
+            commands::save_layout,
+            commands::set_overlays_open,
             commands::set_close_behavior,
+            commands::set_update_settings,
             commands::toggle_overlay_maximized,
         ])
         .run(tauri::generate_context!())

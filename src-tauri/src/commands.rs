@@ -1,9 +1,9 @@
 use crate::{
-    db::{self, Overlay, OverlayInput},
+    db::{self, Group, LayoutItem, Overlay, OverlayInput},
     overlay, AppState,
 };
 use rusqlite::Connection;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 type Res<T> = Result<T, String>;
 
@@ -41,8 +41,8 @@ fn normalize(mut i: OverlayInput) -> Res<OverlayInput> {
     let c = i.border_color.trim();
     let valid = c.len() == 7 && c.starts_with('#') && c[1..].chars().all(|ch| ch.is_ascii_hexdigit());
     i.border_color = if valid { c.to_lowercase() } else { "#ff3b6b".to_string() };
-    i.width = i.width.max(50);
-    i.height = i.height.max(50);
+    i.width = i.width.max(overlay::MIN_SIZE);
+    i.height = i.height.max(overlay::MIN_SIZE);
     Ok(i)
 }
 
@@ -149,6 +149,103 @@ pub async fn set_overlay_audio(
     Ok(())
 }
 
+/// Aktuelle Fenstergröße (bzw. die gespeicherte Größe, falls geschlossen oder maximiert)
+/// als Referenz für 100 % Zoom festlegen.
+#[tauri::command]
+pub async fn set_overlay_reference(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: i64,
+) -> Res<Overlay> {
+    let ov = fetch(&state, id)?;
+    let win = app.get_webview_window(&overlay::label(id));
+    let live = win
+        .as_ref()
+        .filter(|_| !overlay::is_maximized(&app, id))
+        .and_then(|w| w.inner_size().ok());
+    let (w, h) = live.map_or((ov.width, ov.height), |s| (s.width, s.height));
+    let (w, h) = (w.max(overlay::MIN_SIZE), h.max(overlay::MIN_SIZE));
+    with_db(&state, |c| db::set_base_size(c, id, w, h))?;
+    let ov = fetch(&state, id)?;
+    overlay::remember_base(&app, &ov);
+    if let Some(win) = win {
+        overlay::apply_zoom(&win);
+    }
+    Ok(ov)
+}
+
+#[tauri::command]
+pub async fn list_groups(state: State<'_, AppState>) -> Res<Vec<Group>> {
+    with_db(&state, db::list_groups)
+}
+
+#[tauri::command]
+pub async fn create_group(state: State<'_, AppState>, name: String) -> Res<Group> {
+    let name = name.trim();
+    let name = if name.is_empty() { "Neue Gruppe" } else { name };
+    let id = with_db(&state, |c| db::insert_group(c, name))?;
+    with_db(&state, |c| db::get_group(c, id))?.ok_or_else(|| "Gruppe nicht gefunden".to_string())
+}
+
+#[tauri::command]
+pub async fn rename_group(state: State<'_, AppState>, id: i64, name: String) -> Res<()> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Bitte einen Namen eingeben.".into());
+    }
+    with_db(&state, |c| db::rename_group(c, id, name))
+}
+
+#[tauri::command]
+pub async fn set_group_collapsed(state: State<'_, AppState>, id: i64, collapsed: bool) -> Res<()> {
+    with_db(&state, |c| db::set_group_collapsed(c, id, collapsed))
+}
+
+/// Löscht nur die Gruppe, ihre Overlays bleiben erhalten.
+#[tauri::command]
+pub async fn delete_group(state: State<'_, AppState>, id: i64) -> Res<()> {
+    with_db(&state, |c| db::delete_group(c, id))
+}
+
+#[tauri::command]
+pub async fn save_layout(state: State<'_, AppState>, layout: Vec<LayoutItem>) -> Res<()> {
+    with_db(&state, |c| db::save_layout(c, &layout))
+}
+
+/// Mehrere Overlays auf einmal öffnen (aktivieren) oder schließen (deaktivieren).
+#[tauri::command]
+pub async fn set_overlays_open(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    ids: Vec<i64>,
+    open: bool,
+) -> Res<()> {
+    let mut first_error: Option<String> = None;
+    for id in ids {
+        let result = if open {
+            match fetch(&state, id) {
+                Ok(ov) => overlay::open(&app, &ov),
+                Err(e) => Err(e),
+            }
+        } else {
+            match app.get_webview_window(&overlay::label(id)) {
+                Some(win) => win.destroy().map_err(es),
+                None => Ok(()),
+            }
+        };
+        match result {
+            Ok(()) => {
+                let _ = with_db(&state, |c| db::set_enabled(c, id, open));
+            }
+            Err(e) => {
+                first_error.get_or_insert(e);
+            }
+        }
+    }
+    let _ = app.emit("overlays-changed", ());
+    first_error.map_or(Ok(()), Err)
+}
+
 #[tauri::command]
 pub async fn get_app_settings(state: State<'_, AppState>) -> Res<db::AppSettings> {
     with_db(&state, db::get_app_settings)
@@ -160,6 +257,16 @@ pub async fn set_close_behavior(state: State<'_, AppState>, behavior: String) ->
         return Err("Ungültiger Wert für das Schließverhalten.".into());
     }
     with_db(&state, |c| db::set_close_behavior(c, &behavior))
+}
+
+#[tauri::command]
+pub async fn set_update_settings(
+    state: State<'_, AppState>,
+    auto_check: bool,
+    auto_install: bool,
+) -> Res<()> {
+    // Automatisches Installieren setzt die automatische Prüfung voraus.
+    with_db(&state, |c| db::set_update_settings(c, auto_check, auto_check && auto_install))
 }
 
 #[tauri::command]

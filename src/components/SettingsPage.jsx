@@ -4,7 +4,7 @@ import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { api } from "../api";
 
-function Updates({ onError }) {
+function Updates({ onError, autoUpdate, onAutoUpdateChange }) {
   const [version, setVersion] = useState("");
   const [update, setUpdate] = useState(null);
   const [status, setStatus] = useState("idle"); // idle | checking | uptodate | installing
@@ -71,6 +71,44 @@ function Updates({ onError }) {
           </button>
         )}
       </div>
+
+      <label className="switch-row">
+        <span className="switch-text">
+          <span className="switch-label">Beim Start der App nach Updates suchen</span>
+          <span className="hint">
+            Prüft einmalig beim Start, ob auf GitHub eine neuere Version verfügbar ist, und zeigt dann einen Hinweis.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          className="switch"
+          checked={autoUpdate?.check ?? false}
+          disabled={!autoUpdate}
+          onChange={(e) =>
+            onAutoUpdateChange({
+              check: e.target.checked,
+              install: e.target.checked && autoUpdate.install,
+            })
+          }
+        />
+      </label>
+      <label className="switch-row">
+        <span className="switch-text">
+          <span className="switch-label">Updates automatisch installieren</span>
+          <span className="hint">
+            Gefundene Updates werden beim Start ohne Rückfrage heruntergeladen und installiert; die App startet danach neu. Geöffnete Overlays werden dabei kurz geschlossen und starten wieder mit. Setzt die automatische Suche voraus.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          role="switch"
+          className="switch"
+          checked={autoUpdate?.install ?? false}
+          disabled={!autoUpdate?.check}
+          onChange={(e) => onAutoUpdateChange({ check: true, install: e.target.checked })}
+        />
+      </label>
     </section>
   );
 }
@@ -90,13 +128,28 @@ const OPTIONS = [
 
 export default function SettingsPage({ onError }) {
   const [closeBehavior, setCloseBehavior] = useState(null);
+  const [autoUpdate, setAutoUpdate] = useState(null); // { check, install }
 
   useEffect(() => {
     api
       .getAppSettings()
-      .then((s) => setCloseBehavior(s.closeBehavior))
+      .then((s) => {
+        setCloseBehavior(s.closeBehavior);
+        setAutoUpdate({ check: s.autoCheckUpdates, install: s.autoInstallUpdates });
+      })
       .catch((e) => onError(String(e)));
   }, [onError]);
+
+  async function changeAutoUpdate(next) {
+    const previous = autoUpdate;
+    setAutoUpdate(next);
+    try {
+      await api.setUpdateSettings(next.check, next.install);
+    } catch (e) {
+      setAutoUpdate(previous);
+      onError(String(e));
+    }
+  }
 
   async function choose(value) {
     const previous = closeBehavior;
@@ -136,7 +189,7 @@ export default function SettingsPage({ onError }) {
         ))}
       </section>
 
-      <Updates onError={onError} />
+      <Updates onError={onError} autoUpdate={autoUpdate} onAutoUpdateChange={changeAutoUpdate} />
     </div>
   );
 }
