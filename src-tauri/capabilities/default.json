@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Nur das Hauptfenster darf IPC nutzen. Overlay-Fenster (externe URLs) bekommen bewusst keine Rechte.",
+  "windows": ["main"],
+  "permissions": ["core:default"]
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "overlay-windows",
+  "description": "Overlay-Fenster (externe Seiten) dürfen ausschließlich sich selbst verschieben/skalieren. Die Bedienelemente dafür werden nur im Bearbeitungsmodus eingeblendet.",
+  "windows": ["overlay-*"],
+  "remote": {
+    "urls": ["https://*/*", "http://*/*", "https://*:*/*", "http://*:*/*"]
+  },
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging"
+  ]
+}
