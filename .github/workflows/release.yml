@@ -1,10 +1,10 @@
 name: Release
 
 # Release auslösen: Version in package.json, src-tauri/Cargo.toml und src-tauri/tauri.conf.json
-# erhöhen, committen und ein Tag pushen:  git tag v0.2.0 && git push origin v0.2.0
+# erhöhen, committen und ein Tag pushen:  git tag 0.2.0 && git push origin 0.2.0
 on:
   push:
-    tags: ["v*"]
+    tags: ["[0-9]*"]
 
 jobs:
   release:

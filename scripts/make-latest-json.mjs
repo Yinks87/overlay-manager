@@ -37,7 +37,7 @@ const latest = {
     "windows-x86_64": {
       signature: readFileSync(sigPath, "utf8").trim(),
       // GitHub ersetzt Leerzeichen in Asset-Namen durch Punkte.
-      url: `https://github.com/${repo}/releases/download/v${version}/${installer.replace(/ /g, ".")}`,
+      url: `https://github.com/${repo}/releases/download/${version}/${installer.replace(/ /g, ".")}`,
     },
   },
 };
