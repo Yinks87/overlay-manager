@@ -1,6 +1,6 @@
 [package]
 name = "overlay-manager"
-version = "0.1.0"
+version = "0.1.1"
 description = "Hosten und verwalten von Overlays auf jedem Bildschirm"
 edition = "2021"
 
