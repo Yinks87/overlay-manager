@@ -24,8 +24,18 @@
     ],
     "security": { "csp": null }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJFN0REMzkwRUM5MDNGRkQKUldUOVA1RHNrTk45TGx6aWJ0bGxYRmhXbXlCUVRwT25qbTV0ejU4a2ppKytsYzJxaHFvTVFFTDYK",
+      "endpoints": [
+        "https://github.com/yinks87/overlay-manager/releases/latest/download/latest.json"
+      ],
+      "windows": { "installMode": "passive" }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",

@@ -1,5 +1,79 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { api } from "../api";
+
+function Updates({ onError }) {
+  const [version, setVersion] = useState("");
+  const [update, setUpdate] = useState(null);
+  const [status, setStatus] = useState("idle"); // idle | checking | uptodate | installing
+  const [progress, setProgress] = useState(null);
+
+  useEffect(() => {
+    getVersion().then(setVersion).catch(() => {});
+  }, []);
+
+  async function search() {
+    setStatus("checking");
+    try {
+      const found = await check();
+      setUpdate(found);
+      setStatus(found ? "idle" : "uptodate");
+    } catch (e) {
+      setStatus("idle");
+      onError(`Update-Suche fehlgeschlagen: ${e}`);
+    }
+  }
+
+  async function install() {
+    setStatus("installing");
+    let total = 0;
+    let loaded = 0;
+    try {
+      await update.downloadAndInstall((ev) => {
+        if (ev.event === "Started") total = ev.data.contentLength ?? 0;
+        if (ev.event === "Progress") {
+          loaded += ev.data.chunkLength;
+          if (total) setProgress(Math.round((loaded / total) * 100));
+        }
+      });
+      await relaunch();
+    } catch (e) {
+      setStatus("idle");
+      setProgress(null);
+      onError(`Update fehlgeschlagen: ${e}`);
+    }
+  }
+
+  return (
+    <section className="group">
+      <h3>Updates</h3>
+      <p className="hint">Installierte Version: {version || "…"}</p>
+      {update && (
+        <p>
+          Version <strong>{update.version}</strong> ist verfügbar.
+          {update.body && <span className="hint"> {update.body}</span>}
+        </p>
+      )}
+      {status === "uptodate" && <p className="hint">Du verwendest die neueste Version.</p>}
+      {status === "installing" && (
+        <p className="hint">Lädt und installiert{progress !== null ? ` … ${progress} %` : " …"}</p>
+      )}
+      <div>
+        {update ? (
+          <button className="btn primary" onClick={install} disabled={status === "installing"}>
+            Jetzt aktualisieren und neu starten
+          </button>
+        ) : (
+          <button className="btn" onClick={search} disabled={status === "checking"}>
+            {status === "checking" ? "Sucht …" : "Nach Updates suchen"}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
 
 const OPTIONS = [
   {
@@ -61,6 +135,8 @@ export default function SettingsPage({ onError }) {
           </label>
         ))}
       </section>
+
+      <Updates onError={onError} />
     </div>
   );
 }
