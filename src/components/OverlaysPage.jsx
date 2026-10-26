@@ -13,6 +13,11 @@ export default function OverlaysPage({ o, selectedId, onSelect }) {
     if (created) onSelect(created.id);
   }
 
+  async function handleDuplicate(id) {
+    const copy = await o.duplicate(id);
+    if (copy) onSelect(copy.id);
+  }
+
   async function handleCreateGroup() {
     const created = await o.createGroup();
     if (created) setEditGroupId(created.id);
@@ -64,6 +69,7 @@ export default function OverlaysPage({ o, selectedId, onSelect }) {
           onToggle={o.toggleOpen}
           maximizedIds={o.maximizedIds}
           onMaximize={o.toggleMaximized}
+          onDuplicate={handleDuplicate}
           onMove={o.moveItem}
           onToggleCollapsed={o.toggleGroupCollapsed}
           onRenameGroup={o.renameGroup}
@@ -81,6 +87,7 @@ export default function OverlaysPage({ o, selectedId, onSelect }) {
             isOpen={o.openIds.includes(selected.id)}
             onSave={(input) => o.save(selected.id, input)}
             onDelete={() => handleDelete(selected.id)}
+            onDuplicate={() => handleDuplicate(selected.id)}
             onToggleOpen={() => o.toggleOpen(selected.id)}
             isMaximized={o.maximizedIds.includes(selected.id)}
             onMaximize={() => o.toggleMaximized(selected.id)}

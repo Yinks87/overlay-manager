@@ -7,7 +7,9 @@ export const api = {
   getMaximizedOverlays: () => invoke("get_maximized_overlays"),
   toggleMaximized: (id) => invoke("toggle_overlay_maximized", { id }),
   createOverlay: (input) => invoke("create_overlay", { input }),
-  updateOverlay: (id, input) => invoke("update_overlay", { id, input }),
+  duplicateOverlay: (id) => invoke("duplicate_overlay", { id }),
+  updateOverlay: (id, input, resetScale = false) =>
+    invoke("update_overlay", { id, input, resetScale }),
   deleteOverlay: (id) => invoke("delete_overlay", { id }),
   openOverlay: (id) => invoke("open_overlay", { id }),
   closeOverlay: (id) => invoke("close_overlay", { id }),

@@ -221,6 +221,7 @@ pub fn run() {
             commands::list_overlays,
             commands::get_open_overlays,
             commands::create_overlay,
+            commands::duplicate_overlay,
             commands::update_overlay,
             commands::delete_overlay,
             commands::open_overlay,

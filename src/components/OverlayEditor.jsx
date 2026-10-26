@@ -38,6 +38,7 @@ export default function OverlayEditor({
   isOpen,
   onSave,
   onDelete,
+  onDuplicate,
   onToggleOpen,
   isMaximized,
   onMaximize,
@@ -234,6 +235,14 @@ export default function OverlayEditor({
           </button>
         )}
         <span className="spacer" />
+        <button
+          className="btn ghost"
+          onClick={onDuplicate}
+          disabled={dirty}
+          title={dirty ? "Erst die Änderungen speichern oder verwerfen" : "Overlay mit allen Einstellungen kopieren"}
+        >
+          Overlay kopieren
+        </button>
         {confirmDelete ? (
           <>
             <span className="hint">Overlay endgültig löschen?</span>

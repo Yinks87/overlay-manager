@@ -66,16 +66,49 @@ pub async fn create_overlay(state: State<'_, AppState>, input: OverlayInput) -> 
     fetch(&state, id)
 }
 
+/// Kopie eines Overlays mit allen Einstellungen (gesperrt, leicht versetzt, nicht geöffnet).
+#[tauri::command]
+pub async fn duplicate_overlay(state: State<'_, AppState>, id: i64) -> Res<Overlay> {
+    let src = fetch(&state, id)?;
+    const OFFSET: i32 = 40;
+    let input = OverlayInput {
+        name: format!("{} (Kopie)", src.name),
+        url: src.url.clone(),
+        x: src.x.saturating_add(OFFSET),
+        y: src.y.saturating_add(OFFSET),
+        width: src.width,
+        height: src.height,
+        locked: true,
+        volume: src.volume,
+        muted: src.muted,
+        transparent_bg: src.transparent_bg,
+        border_enabled: src.border_enabled,
+        border_color: src.border_color.clone(),
+        mute_indicator: src.mute_indicator,
+    };
+    let new_id = with_db(&state, |c| {
+        let new_id = db::insert(c, &input)?;
+        db::set_base_size(c, new_id, src.base_width, src.base_height)?;
+        Ok(new_id)
+    })?;
+    fetch(&state, new_id)
+}
+
 #[tauri::command]
 pub async fn update_overlay(
     app: AppHandle,
     state: State<'_, AppState>,
     id: i64,
     input: OverlayInput,
+    reset_scale: Option<bool>,
 ) -> Res<Overlay> {
     let input = normalize(input)?;
     let old = fetch(&state, id)?;
     with_db(&state, |c| db::update(c, id, &input))?;
+    if reset_scale.unwrap_or(false) {
+        // Gespeicherte Größe wird zur Referenz = 100 % Skalierung.
+        with_db(&state, |c| db::set_base_size(c, id, input.width, input.height))?;
+    }
     let ov = fetch(&state, id)?;
     if let Some(win) = app.get_webview_window(&overlay::label(id)) {
         overlay::sync(&win, &ov)?;

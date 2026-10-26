@@ -11,6 +11,7 @@ export function useOverlays() {
   const [maximizedIds, setMaximizedIds] = useState([]);
   const [error, setError] = useState(null);
   const audioTimers = useRef({});
+  const newIds = useRef(new Set());
   const state = useRef({ overlays: [], groups: [] });
   state.current = { overlays, groups };
 
@@ -108,12 +109,21 @@ export function useOverlays() {
     create: () =>
       run(async () => {
         const created = await api.createOverlay(NEW_OVERLAY);
+        newIds.current.add(created.id);
         setOverlays((p) => [...p, created]);
         return created;
       }),
+    duplicate: (id) =>
+      run(async () => {
+        const copy = await api.duplicateOverlay(id);
+        setOverlays((p) => [...p, copy]);
+        return copy;
+      }),
     save: (id, input) =>
       run(async () => {
-        const saved = await api.updateOverlay(id, input);
+        // Erstes Speichern eines neuen Overlays: Skalierung auf 100 % setzen.
+        const saved = await api.updateOverlay(id, input, newIds.current.has(id));
+        newIds.current.delete(id);
         patch(id, saved);
         return saved;
       }),

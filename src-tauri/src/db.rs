@@ -119,8 +119,8 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
             size_height    INTEGER NOT NULL DEFAULT 600,
             close_behavior TEXT    NOT NULL DEFAULT 'exit',
             dashboard_saved INTEGER NOT NULL DEFAULT 0,
-            auto_check_updates   INTEGER NOT NULL DEFAULT 0,
-            auto_install_updates INTEGER NOT NULL DEFAULT 0
+            auto_check_updates   INTEGER NOT NULL DEFAULT 1,
+            auto_install_updates INTEGER NOT NULL DEFAULT 1
          );",
     )?;
     // Migration für Datenbanken aus älteren Versionen (Fehler = Spalte existiert schon).
@@ -148,11 +148,11 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
         [],
     );
     let _ = conn.execute(
-        "ALTER TABLE app_settings ADD COLUMN auto_check_updates INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE app_settings ADD COLUMN auto_check_updates INTEGER NOT NULL DEFAULT 1",
         [],
     );
     let _ = conn.execute(
-        "ALTER TABLE app_settings ADD COLUMN auto_install_updates INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE app_settings ADD COLUMN auto_install_updates INTEGER NOT NULL DEFAULT 1",
         [],
     );
     // Bereits gespeicherte Dashboard-Geometrie (Zeile existiert) bleibt gültig.

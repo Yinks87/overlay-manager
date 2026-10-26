@@ -13,6 +13,13 @@ const IconRestore = () => (
   </svg>
 );
 
+const IconCopy = () => (
+  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+    <rect x="5.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    <path d="M10.5 5.5v-3h-8v8h3" fill="none" stroke="currentColor" strokeWidth="1.6" />
+  </svg>
+);
+
 export default function OverlayList({
   overlays,
   groups,
@@ -22,6 +29,7 @@ export default function OverlayList({
   onSelect,
   onToggle,
   onMaximize,
+  onDuplicate,
   onMove,
   onToggleCollapsed,
   onRenameGroup,
@@ -110,6 +118,14 @@ export default function OverlayList({
             <span className="row-name">{o.name}</span>
             <span className="row-url">{o.url.replace(/^https?:\/\//, "")}</span>
           </span>
+        </button>
+        <button
+          className="btn small icon"
+          onClick={() => onDuplicate(o.id)}
+          title="Overlay kopieren"
+          aria-label={`${o.name} kopieren`}
+        >
+          <IconCopy />
         </button>
         <button
           className="btn small icon"
