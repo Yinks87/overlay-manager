@@ -94,7 +94,7 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
             transparent_bg INTEGER NOT NULL DEFAULT 1,
             border_enabled INTEGER NOT NULL DEFAULT 0,
             border_color   TEXT    NOT NULL DEFAULT '#ff3b6b',
-            mute_indicator INTEGER NOT NULL DEFAULT 0,
+            mute_indicator INTEGER NOT NULL DEFAULT 1,
             maximized      INTEGER NOT NULL DEFAULT 0,
             enabled        INTEGER NOT NULL DEFAULT 0,
             base_width     INTEGER NOT NULL DEFAULT 640,
@@ -128,7 +128,7 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     for ddl in [
         "ALTER TABLE overlays ADD COLUMN border_enabled INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE overlays ADD COLUMN border_color TEXT NOT NULL DEFAULT '#ff3b6b'",
-        "ALTER TABLE overlays ADD COLUMN mute_indicator INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE overlays ADD COLUMN mute_indicator INTEGER NOT NULL DEFAULT 1",
         "ALTER TABLE overlays ADD COLUMN maximized INTEGER NOT NULL DEFAULT 0",
     ] {
         let _ = conn.execute(ddl, []);
