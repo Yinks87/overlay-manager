@@ -43,24 +43,32 @@ export default function App() {
       </aside>
 
       <main className="stage">
-        {(startupUpdate.installing || startupUpdate.available || o.error) && (
+        {(startupUpdate.installing || startupUpdate.available || startupUpdate.error || o.error) && (
           <div className="banners">
             {startupUpdate.installing && (
               <div className="banner info" role="status">
                 <span>Update wird heruntergeladen und installiert … Die App startet gleich neu.</span>
               </div>
             )}
-            {startupUpdate.available && (
+            {startupUpdate.available && !startupUpdate.installing && (
               <div className="banner info" role="status">
                 <span>Version {startupUpdate.available} ist verfügbar.</span>
                 <span className="banner-actions">
-                  <button className="btn" onClick={() => setPage("settings")}>
-                    Zu den Einstellungen
+                  <button className="btn primary" onClick={startupUpdate.install}>
+                    Jetzt aktualisieren
                   </button>
                   <button className="btn ghost" onClick={startupUpdate.dismiss}>
                     Später
                   </button>
                 </span>
+              </div>
+            )}
+            {startupUpdate.error && (
+              <div className="banner" role="alert">
+                <span>{startupUpdate.error}</span>
+                <button className="btn ghost" onClick={startupUpdate.clearError}>
+                  Schließen
+                </button>
               </div>
             )}
             {o.error && (

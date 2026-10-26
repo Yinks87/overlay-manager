@@ -11,7 +11,22 @@ import { api } from "../api";
 export function useStartupUpdate() {
   const [available, setAvailable] = useState(null);
   const [installing, setInstalling] = useState(false);
+  const [error, setError] = useState(null);
   const started = useRef(false);
+  const updateRef = useRef(null);
+
+  async function install() {
+    if (!updateRef.current) return;
+    setError(null);
+    setInstalling(true);
+    try {
+      await updateRef.current.downloadAndInstall();
+      await relaunch();
+    } catch (e) {
+      setInstalling(false);
+      setError(`Update fehlgeschlagen: ${e}`);
+    }
+  }
 
   useEffect(() => {
     if (started.current) return;
@@ -23,6 +38,7 @@ export function useStartupUpdate() {
         if (!settings.autoCheckUpdates) return;
         const update = await check();
         if (!update) return;
+        updateRef.current = update;
         if (settings.autoInstallUpdates) {
           setInstalling(true);
           await update.downloadAndInstall();
@@ -38,5 +54,12 @@ export function useStartupUpdate() {
     })();
   }, []);
 
-  return { available, installing, dismiss: () => setAvailable(null) };
+  return {
+    available,
+    installing,
+    error,
+    install,
+    dismiss: () => setAvailable(null),
+    clearError: () => setError(null),
+  };
 }
