@@ -153,6 +153,18 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 
 @media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
 
+/* ── Kontextmenü der Overlay-Karten ── */
+.ctx-menu { position: fixed; z-index: 1000; min-width: 250px; max-width: 320px; padding: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; gap: 2px; }
+.ctx-title { padding: 6px 10px 4px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 12.5px; }
+.ctx-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 6px; padding: 7px 10px; }
+.ctx-item:hover:not(:disabled), .ctx-item:focus-visible { background: var(--panel-2); }
+.ctx-item:disabled { opacity: 0.45; cursor: default; }
+.ctx-check { width: 14px; color: var(--accent); font-weight: 700; flex: none; }
+.ctx-sep { height: 1px; margin: 4px 6px; background: var(--line); }
+.ctx-slider { display: grid; grid-template-columns: auto 1fr 52px; align-items: center; gap: 10px; padding: 6px 10px; }
+.ctx-slider span { color: var(--muted); font-size: 12.5px; }
+.ctx-slider output { text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+
 /* ── Ergänzungen: Maximieren, Rahmenfarbe ── */
 .head-actions { display: flex; gap: 8px; flex: none; }
 .btn.icon { display: inline-flex; align-items: center; padding: 4px 8px; }

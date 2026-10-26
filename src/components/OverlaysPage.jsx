@@ -60,6 +60,8 @@ export default function OverlaysPage({ o, selectedId, onSelect }) {
           </button>
         </div>
 
+        <p className="hint">Rechtsklick auf ein Overlay öffnet die Schnellaktionen.</p>
+
         <OverlayList
           overlays={o.overlays}
           groups={o.groups}
@@ -70,6 +72,8 @@ export default function OverlaysPage({ o, selectedId, onSelect }) {
           maximizedIds={o.maximizedIds}
           onMaximize={o.toggleMaximized}
           onDuplicate={handleDuplicate}
+          onAudio={o.setAudio}
+          onLocked={o.setLocked}
           onMove={o.moveItem}
           onToggleCollapsed={o.toggleGroupCollapsed}
           onRenameGroup={o.renameGroup}

@@ -5,7 +5,7 @@ const intersects = (o, m) =>
  * Miniatur aller angeschlossenen Monitore in ihrer tatsächlichen Anordnung.
  * Zeigt, wo welches Overlay liegt und auf welchem Monitor das Dashboard ist.
  */
-export default function ScreenMap({ monitors, overlays, openIds, selectedId, onSelect, maxHeight = 240 }) {
+export default function ScreenMap({ monitors, overlays, openIds, selectedId, onSelect, onContextMenu, maxHeight = 240 }) {
   if (!monitors.length) return <p className="hint">Monitore werden ermittelt …</p>;
 
   const minX = Math.min(...monitors.map((m) => m.x));
@@ -40,6 +40,7 @@ export default function ScreenMap({ monitors, overlays, openIds, selectedId, onS
             key={o.id}
             title={o.name}
             onClick={() => onSelect(o.id)}
+            onContextMenu={onContextMenu ? (e) => onContextMenu(o.id, e) : undefined}
             className={[
               "ghost-rect",
               openIds.includes(o.id) ? "open" : "",

@@ -1,10 +1,27 @@
+import { useCallback, useState } from "react";
 import { useMonitors } from "../hooks/useMonitors";
 import ScreenMap from "./ScreenMap";
+import OverlayContextMenu, { menuPosition } from "./OverlayContextMenu";
 
 /** Startseite: alle Monitore mit den Positionen der Overlays. */
-export default function DashboardPage({ overlays, openIds, selectedId, onSelect, onSetOpen }) {
+export default function DashboardPage({
+  overlays,
+  openIds,
+  maximizedIds,
+  selectedId,
+  onSelect,
+  onSetOpen,
+  onToggle,
+  onMaximize,
+  onLocked,
+  onAudio,
+  onDuplicate,
+}) {
   const monitors = useMonitors();
   const allIds = overlays.map((o) => o.id);
+  const [menu, setMenu] = useState(null); // { id, x, y }
+  const closeMenu = useCallback(() => setMenu(null), []);
+  const menuOverlay = menu ? overlays.find((o) => o.id === menu.id) : null;
 
   return (
     <div className="page-content">
@@ -47,14 +64,35 @@ export default function DashboardPage({ overlays, openIds, selectedId, onSelect,
           openIds={openIds}
           selectedId={selectedId}
           onSelect={onSelect}
+          onContextMenu={(id, e) => {
+            e.preventDefault();
+            setMenu({ id, ...menuPosition(e) });
+          }}
           maxHeight={460}
         />
         <p className="hint legend">
           <span className="swatch open" /> geöffnet
           <span className="swatch" /> geschlossen
-          · Ein Klick auf ein Overlay öffnet seine Einstellungen.
+          · Klick öffnet die Einstellungen, Rechtsklick die Schnellaktionen.
         </p>
       </section>
+
+      {menu && menuOverlay && (
+        <OverlayContextMenu
+          overlay={menuOverlay}
+          x={menu.x}
+          y={menu.y}
+          isOpen={openIds.includes(menuOverlay.id)}
+          isMaximized={maximizedIds.includes(menuOverlay.id)}
+          onClose={closeMenu}
+          onToggleOpen={() => onToggle(menuOverlay.id)}
+          onMaximize={() => onMaximize(menuOverlay.id)}
+          onLocked={(locked) => onLocked(menuOverlay.id, locked)}
+          onAudio={(volume, muted) => onAudio(menuOverlay.id, volume, muted)}
+          onDuplicate={() => onDuplicate(menuOverlay.id)}
+          onEdit={() => onSelect(menuOverlay.id)}
+        />
+      )}
     </div>
   );
 }

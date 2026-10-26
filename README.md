@@ -28,6 +28,7 @@ Ein Hauptmenü links bietet drei Seiten:
 - **Bildschirmübersicht**: Eine Miniatur zeigt **alle angeschlossenen Monitore** in ihrer tatsächlichen Anordnung (Position im virtuellen Desktop), markiert Hauptmonitor und den Monitor, auf dem das Dashboard liegt, und zeigt alle Overlays maßstabsgetreu darauf. Overlays außerhalb aller Monitore werden aufgelistet.
 - **Gruppen**: Overlays lassen sich in Gruppen ordnen (Button „Neue Gruppe“, Doppelklick oder ✎ zum Umbenennen, ✕ löscht nur die Gruppe, die Overlays bleiben erhalten). Gruppen sind auf- und zuklappbar; jede Gruppe hat einen eigenen Button zum Öffnen/Schließen aller ihrer Overlays.
 - **Drag & Drop**: Overlays und Gruppen lassen sich per Ziehen in der Liste umsortieren; Overlays können zwischen Gruppen und der obersten Ebene verschoben werden. Die Reihenfolge wird gespeichert.
+- **Kontextmenü**: Rechtsklick auf eine Overlay-Karte öffnet Schnellaktionen: Öffnen/Schließen, Maximieren, Einstellungen bearbeiten, Bearbeitungsmodus, Stummschalten, Lautstärkeregler, Kopieren (Duplizieren) und URL in die Zwischenablage. Bedienung auch per Tastatur (Pfeiltasten, Esc).
 - **Alle öffnen / Alle schließen**: aktiviert bzw. deaktiviert alle Overlays auf einmal (das Aktiviert-Merkmal bestimmt, was beim nächsten App-Start geöffnet wird).
 
 ### Dashboard und App-Einstellungen

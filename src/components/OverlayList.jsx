@@ -1,24 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildTree } from "../layout";
-
-const IconMax = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-    <rect x="2.5" y="2.5" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.6" />
-  </svg>
-);
-const IconRestore = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-    <rect x="2.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.6" />
-    <path d="M5.5 5.5V2.5h8v8h-3" fill="none" stroke="currentColor" strokeWidth="1.6" />
-  </svg>
-);
-
-const IconCopy = () => (
-  <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
-    <rect x="5.5" y="5.5" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.6" />
-    <path d="M10.5 5.5v-3h-8v8h3" fill="none" stroke="currentColor" strokeWidth="1.6" />
-  </svg>
-);
+import OverlayContextMenu, { menuPosition } from "./OverlayContextMenu";
 
 export default function OverlayList({
   overlays,
@@ -30,6 +12,8 @@ export default function OverlayList({
   onToggle,
   onMaximize,
   onDuplicate,
+  onAudio,
+  onLocked,
   onMove,
   onToggleCollapsed,
   onRenameGroup,
@@ -43,6 +27,8 @@ export default function OverlayList({
   const [hint, setHint] = useState(null); // { type, id, kind }
   const [editing, setEditing] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [menu, setMenu] = useState(null); // { id, x, y }
+  const closeMenu = useCallback(() => setMenu(null), []);
 
   useEffect(() => {
     if (editGroupId != null) setEditing(editGroupId);
@@ -92,12 +78,15 @@ export default function OverlayList({
 
   const renderOverlay = (o, parentGroupId) => {
     const open = openIds.includes(o.id);
-    const maxed = maximizedIds.includes(o.id);
     return (
       <li
         key={o.id}
         className={["row", o.id === selectedId ? "selected" : "", hintClass("overlay", o.id)].join(" ")}
         draggable
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenu({ id: o.id, ...menuPosition(e) });
+        }}
         onDragStart={(e) => startDrag(e, { type: "overlay", id: o.id })}
         onDragEnd={endDrag}
         onDragOver={(e) => {
@@ -118,30 +107,6 @@ export default function OverlayList({
             <span className="row-name">{o.name}</span>
             <span className="row-url">{o.url.replace(/^https?:\/\//, "")}</span>
           </span>
-        </button>
-        <button
-          className="btn small icon"
-          onClick={() => onDuplicate(o.id)}
-          title="Overlay kopieren"
-          aria-label={`${o.name} kopieren`}
-        >
-          <IconCopy />
-        </button>
-        <button
-          className="btn small icon"
-          disabled={!open}
-          onClick={() => onMaximize(o.id)}
-          title={maxed ? "Verkleinern" : "Maximieren"}
-          aria-label={maxed ? `${o.name} verkleinern` : `${o.name} maximieren`}
-        >
-          {maxed ? <IconRestore /> : <IconMax />}
-        </button>
-        <button
-          className={open ? "btn small stop" : "btn small"}
-          onClick={() => onToggle(o.id)}
-          aria-label={open ? `${o.name} schließen` : `${o.name} öffnen`}
-        >
-          {open ? "Schließen" : "Öffnen"}
         </button>
       </li>
     );
@@ -264,7 +229,10 @@ export default function OverlayList({
     );
   };
 
+  const menuOverlay = menu ? overlays.find((x) => x.id === menu.id) : null;
+
   return (
+    <>
     <ul
       className="list"
       onDragLeave={(e) => {
@@ -282,5 +250,22 @@ export default function OverlayList({
         </li>
       )}
     </ul>
+    {menu && menuOverlay && (
+      <OverlayContextMenu
+        overlay={menuOverlay}
+        x={menu.x}
+        y={menu.y}
+        isOpen={openIds.includes(menuOverlay.id)}
+        isMaximized={maximizedIds.includes(menuOverlay.id)}
+        onClose={closeMenu}
+        onToggleOpen={() => onToggle(menuOverlay.id)}
+        onMaximize={() => onMaximize(menuOverlay.id)}
+        onLocked={(locked) => onLocked(menuOverlay.id, locked)}
+        onAudio={(volume, muted) => onAudio(menuOverlay.id, volume, muted)}
+        onDuplicate={() => onDuplicate(menuOverlay.id)}
+        onEdit={() => onSelect(menuOverlay.id)}
+      />
+    )}
+    </>
   );
 }

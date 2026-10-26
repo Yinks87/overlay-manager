@@ -79,9 +79,15 @@ export default function App() {
             <DashboardPage
               overlays={o.overlays}
               openIds={o.openIds}
+              maximizedIds={o.maximizedIds}
               selectedId={selectedId}
               onSelect={openOverlayPage}
               onSetOpen={o.setOpen}
+              onToggle={o.toggleOpen}
+              onMaximize={o.toggleMaximized}
+              onLocked={o.setLocked}
+              onAudio={o.setAudio}
+              onDuplicate={o.duplicate}
             />
           </div>
         )}
