@@ -1,18 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-/** Menüposition aus einem contextmenu-Event; per Tastatur (keine Mauskoordinaten) unter dem Element. */
 export function menuPosition(e) {
   const r = e.currentTarget.getBoundingClientRect();
   const fromKeyboard = e.clientX === 0 && e.clientY === 0;
   return { x: fromKeyboard ? r.left + 24 : e.clientX, y: fromKeyboard ? r.bottom : e.clientY };
 }
 
-/**
- * Kontextmenü einer Overlay-Karte. Zeigt immer den aktuellen Zustand des Overlays
- * (Lautstärke, Stumm, Bearbeitungsmodus) und bleibt bei Einstellungen offen,
- * bei Aktionen (Öffnen, Maximieren, Kopieren …) schließt es sich.
- */
 export default function OverlayContextMenu({
   overlay,
   x,
@@ -31,7 +25,6 @@ export default function OverlayContextMenu({
   const [pos, setPos] = useState({ left: x, top: y });
   const [copied, setCopied] = useState(false);
 
-  // Im sichtbaren Bereich halten.
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -67,7 +60,6 @@ export default function OverlayContextMenu({
     };
   }, [onClose]);
 
-  // Pfeiltasten wechseln zwischen den Einträgen.
   const onKeyDown = (e) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
     if (e.target instanceof HTMLInputElement) return;

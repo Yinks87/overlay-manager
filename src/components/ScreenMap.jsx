@@ -1,10 +1,6 @@
 const intersects = (o, m) =>
   o.x < m.x + m.width && o.x + o.width > m.x && o.y < m.y + m.height && o.y + o.height > m.y;
 
-/**
- * Miniatur aller angeschlossenen Monitore in ihrer tatsächlichen Anordnung.
- * Zeigt, wo welches Overlay liegt und auf welchem Monitor das Dashboard ist.
- */
 export default function ScreenMap({ monitors, overlays, openIds, selectedId, onSelect, onContextMenu, maxHeight = 240 }) {
   if (!monitors.length) return <p className="hint">Monitore werden ermittelt …</p>;
 

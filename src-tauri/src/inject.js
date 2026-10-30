@@ -18,7 +18,6 @@
   const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
   const level = () => (cfg.muted ? 0 : clamp01(cfg.volume));
 
-  // ── 1) <audio>/<video> ──
   const volDesc = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, "volume");
   const wanted = new WeakMap();
   const tracked = new Set();
@@ -43,7 +42,6 @@
     }, true);
   }
 
-  // ── 2) Web Audio: Master-Gain vor dem Ausgang ──
   const masters = new Set();
   for (const name of ["AudioContext", "webkitAudioContext"]) {
     const Orig = window[name];
@@ -62,7 +60,6 @@
     window[name] = Patched;
   }
 
-  // ── 3) Transparenter Hintergrund (konstruierte Stylesheets: CSP-sicher) ──
   let tSheet = null;
   function setTransparent(on) {
     try {
@@ -77,7 +74,6 @@
     } catch (_) {}
   }
 
-  // ── 4) Farbiger Rahmen + Bearbeitungsmodus (Verschiebe-Balken, Anfasser) ──
   const tauriInvoke = (cmd, args) => {
     try {
       const i = window.__TAURI_INTERNALS__;
@@ -99,7 +95,6 @@
     .bar{position:absolute;top:0;left:0;right:0;height:26px;box-sizing:border-box;padding:0 14px;display:flex;align-items:center;
          background:var(--c);font:600 11.5px/1 "Segoe UI",system-ui,sans-serif;cursor:move;pointer-events:auto;user-select:none;white-space:nowrap;overflow:hidden}
     .h{position:absolute;pointer-events:auto}
-    /* Kanten: unsichtbare Griffzone, zeigt beim Überfahren eine kleine Markierung */
     .n,.s{left:24px;right:24px;height:10px}
     .e,.w{top:24px;bottom:24px;width:10px}
     .n{top:0;cursor:ns-resize}.s{bottom:0;cursor:ns-resize}
@@ -111,7 +106,6 @@
     .e::after,.w::after{top:50%;height:40px;width:5px;margin-top:-20px}
     .e::after{right:0}.w::after{left:0}
     .h:hover::after{opacity:1}
-    /* Ecken: schmale Winkel statt Klötze */
     .ne,.nw,.se,.sw{width:24px;height:24px}
     .ne::after,.nw::after,.se::after,.sw::after{content:"";position:absolute;width:16px;height:16px;border:0 solid var(--c);
          filter:drop-shadow(0 0 1px rgba(0,0,0,.55))}
@@ -121,7 +115,6 @@
     .nw::after{top:0;left:0;border-top-width:5px;border-left-width:5px;border-top-left-radius:4px}
     .se::after{bottom:0;right:0;border-bottom-width:5px;border-right-width:5px;border-bottom-right-radius:4px}
     .sw::after{bottom:0;left:0;border-bottom-width:5px;border-left-width:5px;border-bottom-left-radius:4px}
-    /* Stumm-Symbol */
     .mute{position:absolute;top:12px;right:12px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.62);
          display:none;align-items:center;justify-content:center;pointer-events:none}
     .mute.edit{top:38px}`;

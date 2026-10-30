@@ -6,10 +6,6 @@ const sameMonitor = (a, b) =>
   a.position.x === b.position.x && a.position.y === b.position.y &&
   a.size.width === b.size.width && a.size.height === b.size.height;
 
-/**
- * Alle angeschlossenen Monitore (physische Pixel im gemeinsamen virtuellen Desktop),
- * inklusive Hauptmonitor und dem Monitor, auf dem das Dashboard gerade liegt.
- */
 export function useMonitors() {
   const [monitors, setMonitors] = useState([]);
 

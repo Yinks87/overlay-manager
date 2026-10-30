@@ -44,6 +44,15 @@ Ein Hauptmenü links bietet drei Seiten:
 
 Alle Daten (Overlays, Einstellungen) liegen in einer lokalen SQLite-Datei unter `%APPDATA%\com.example.overlaymanager\overlays.db`.
 
+### Bekannte Grenzen
+
+- **Vollbild-Spiele**: Overlays erscheinen nur über Fenster-/Rahmenlos-Vollbild, nicht über exklusivem Vollbild.
+- **Audio**: Die Lautstärkeregelung ist eine Best-Effort-Injektion (HTML-Media + Web Audio). Seiten mit eigenem Audio-Backend (z. B. reine WASM-Ausgabe) werden nicht erfasst.
+- **Transparenz**: Der Seitenhintergrund wird per CSS transparent gesetzt. Seiten, die ihren Hintergrund auf einem inneren Element zeichnen, bleiben dort deckend.
+- **Mehrere Monitore / DPI**: Die Koordinaten der Overlays gelten im gemeinsamen virtuellen Desktop in physischen Pixeln (negative Werte = Monitor links/oberhalb des Hauptmonitors).
+- **Deadlock-Regel**: Beim Erweitern des Rust-Codes den DB-Lock nie während Fenster-Aufrufen halten.
+
+
 ## 1. Voraussetzungen (Windows 10/11)
 
 - [Node.js LTS](https://nodejs.org)
@@ -104,60 +113,4 @@ Den öffentlichen Schlüssel (`.key.pub`) in `plugins.updater.pubkey` eintragen.
 Der Workflow `.github/workflows/release.yml` baut, signiert und veröffentlicht automatisch, sobald ein Tag gepusht wird, der mit einer Ziffer beginnt (z. B. `git tag 0.2.0; git push origin 0.2.0`). Dafür muss im Repository das Secret `TAURI_SIGNING_PRIVATE_KEY` (Inhalt der privaten Schlüsseldatei) angelegt sein.
 
 Der Windows-Installer ist nicht code-signiert, SmartScreen kann deshalb beim ersten Start warnen.
-
-## 5. Projektstruktur
-
-```
-overlay-manager/
-├─ package.json · vite.config.js · index.html
-├─ scripts/make-latest-json.mjs  ← erzeugt latest.json für den Updater
-├─ .github/workflows/release.yml ← Release-Build per GitHub Actions
-├─ src/                          ← React (JSX)
-│  ├─ main.jsx · App.jsx · App.css   ← App.jsx: Hauptmenü und Seitenwechsel
-│  ├─ api.js                     ← invoke()-Wrapper für die Rust-Commands
-│  ├─ hooks/useOverlays.js       ← Zustand, Events, optimistische Updates
-│  ├─ hooks/useMonitors.js       ← angeschlossene Monitore (Position, Größe, Haupt-/Dashboard-Monitor)
-│  ├─ layout.js                  ← Listenstruktur: Gruppen, Sortierung, Drag-&-Drop-Logik
-│  └─ components/
-│     ├─ OverlayList.jsx         ← Liste mit Gruppen, Drag & Drop, Öffnen/Schließen/Maximieren
-│     ├─ OverlayEditor.jsx       ← Einstellungen je Overlay
-│     ├─ ScreenMap.jsx           ← Miniatur aller Monitore mit allen Overlays
-│     ├─ DashboardPage.jsx       ← Startseite: Monitore + Overlay-Positionen
-│     ├─ OverlaysPage.jsx        ← Overlay-Seite: Liste + Editor
-│     └─ SettingsPage.jsx        ← App-Einstellungen (Schließverhalten, Updates)
-└─ src-tauri/
-   ├─ tauri.conf.json · Cargo.toml · build.rs
-   ├─ capabilities/              ← IPC-Rechte (default.json: Dashboard, overlays.json: Overlay-Fenster)
-   └─ src/
-      ├─ main.rs · lib.rs        ← Setup, Single-Instance, Tray, Window-Events
-      ├─ db.rs                   ← SQLite (rusqlite): Schema, Migrationen, CRUD, App-Einstellungen
-      ├─ overlay.rs              ← Multi-Window, Click-Through, Lock, Maximieren, Geometrie
-      ├─ commands.rs             ← Tauri-Commands für das Frontend
-      └─ inject.js               ← Audio-Regler, Transparenz, Rahmen, Bedienelemente (in die Seite injiziert)
-```
-
-## 6. So funktioniert es
-
-| Anforderung | Umsetzung |
-|---|---|
-| Eigenes Fenster pro Overlay | `WebviewWindowBuilder` mit `WebviewUrl::External(url)`, Label `overlay-<id>` (`overlay.rs::open`) |
-| Rahmenlos + transparent | `.decorations(false).transparent(true).shadow(false).always_on_top(true).skip_taskbar(true)` – **nie** nativer Rahmen, Titelleiste oder Schließen-Button |
-| Click-Through | `window.set_ignore_cursor_events(true)` im gesperrten Zustand (`overlay.rs::apply_mode`) |
-| Bearbeitungsmodus | **Aus (gesperrt)** = durchklickbar. **An** = Seite blendet per `inject.js` einen Verschiebe-Balken sowie Anfasser an Kanten/Ecken ein (Drag/Resize über `core:window:allow-start-dragging` / `-resize-dragging`, nur für `overlay-*`, siehe `capabilities/overlays.json`). Position/Größe werden dabei automatisch in SQLite gespeichert |
-| Maximieren | Overlay füllt den aktuellen Monitor; gespeicherte Position/Größe bleiben unverändert. Spalte `maximized` merkt sich den Zustand für den nächsten Start |
-| Lautstärke / Mute | `inject.js` skaliert `<audio>`/`<video>` und die Web Audio API (Master-Gain) und wird live per `eval` gesteuert |
-| Aktiviert-Status | Spalte `enabled`: wird beim Öffnen/Schließen gesetzt; `lib.rs::setup` öffnet beim App-Start alle aktivierten Overlays |
-| Dashboard-Geometrie | Position/Größe des Hauptfensters in `app_settings` (`position_x/y`, `size_width/height`), Wiederherstellung beim Start (nur, wenn die Position auf einem vorhandenen Monitor liegt) |
-| Schließverhalten | `app_settings.close_behavior` (`exit` oder `minimize`); bei `minimize` wird das Fenster versteckt und ein Tray-Symbol eingeblendet |
-| Einzelinstanz | `tauri-plugin-single-instance` |
-| Persistenz | SQLite; das Frontend spricht nur über Tauri-Commands mit der DB. Ältere Datenbanken werden beim Start automatisch migriert |
-| Sicherheit | Overlay-Fenster laden externe Seiten und dürfen nur ihr eigenes Fenster ziehen/skalieren, sie haben keinen Zugriff auf weitere Tauri-IPC. Lade nur Seiten, denen du vertraust |
-
-## 7. Bekannte Grenzen
-
-- **Vollbild-Spiele**: Overlays erscheinen nur über Fenster-/Rahmenlos-Vollbild, nicht über exklusivem Vollbild.
-- **Audio**: Die Lautstärkeregelung ist eine Best-Effort-Injektion (HTML-Media + Web Audio). Seiten mit eigenem Audio-Backend (z. B. reine WASM-Ausgabe) werden nicht erfasst.
-- **Transparenz**: Der Seitenhintergrund wird per CSS transparent gesetzt. Seiten, die ihren Hintergrund auf einem inneren Element zeichnen, bleiben dort deckend.
-- **Mehrere Monitore / DPI**: Die Koordinaten der Overlays gelten im gemeinsamen virtuellen Desktop in physischen Pixeln (negative Werte = Monitor links/oberhalb des Hauptmonitors).
-- **Deadlock-Regel**: Beim Erweitern des Rust-Codes den DB-Lock nie während Fenster-Aufrufen halten.
 

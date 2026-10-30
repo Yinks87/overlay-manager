@@ -3,7 +3,6 @@ import { listen } from "@tauri-apps/api/event";
 import { api, NEW_OVERLAY } from "../api";
 import { applyLayoutToState, applyMove, buildTree, toLayout } from "../layout";
 
-/** Zentraler Zustand: SQLite (über Tauri-Commands) ist die Quelle der Wahrheit. */
 export function useOverlays() {
   const [overlays, setOverlays] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -41,7 +40,6 @@ export function useOverlays() {
 
   useEffect(() => {
     reload();
-    // Backend meldet: Fenster geöffnet/geschlossen bzw. Position/Größe geändert.
     const subs = [
       listen("overlays-changed", () => reload()),
       listen("overlay-geometry", (e) => patch(e.payload.id, e.payload)),

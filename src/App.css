@@ -68,7 +68,6 @@ button { cursor: pointer; }
 .dot { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--muted); flex: none; display: inline-block; }
 .dot.live { background: var(--live); border-color: var(--live); box-shadow: 0 0 0 4px rgba(255, 138, 92, 0.22); }
 
-/* ── Bildschirmübersicht (das auffällige Element) ── */
 .screenmap { margin: 0; }
 .desktop { position: relative; width: 100%; margin: 0 auto; overflow: hidden; background: #0b0e15; border-radius: 4px; }
 .monitor { position: absolute; background: #10141d; border: 1px solid var(--line); box-sizing: border-box; }
@@ -165,7 +164,6 @@ input[type="range"] { accent-color: var(--accent); width: 100%; }
 .ctx-slider span { color: var(--muted); font-size: 12.5px; }
 .ctx-slider output { text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; }
 
-/* ── Ergänzungen: Maximieren, Rahmenfarbe ── */
 .head-actions { display: flex; gap: 8px; flex: none; }
 .btn.icon { display: inline-flex; align-items: center; padding: 4px 8px; }
 .color-row { display: flex; align-items: center; gap: 12px; }

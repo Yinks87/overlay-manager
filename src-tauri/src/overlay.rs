@@ -34,8 +34,6 @@ fn zoom_factor(w: u32, h: u32, base: (u32, u32)) -> f64 {
         .clamp(ZOOM_RANGE.0, ZOOM_RANGE.1)
 }
 
-/// JS, das beim Dokumentstart in jeden Frame injiziert wird
-/// (Audio, Transparenz, farbiger Rahmen, Verschiebe-/Skalier-Bedienelemente, Stumm-Symbol).
 fn init_script(ov: &Overlay) -> String {
     let zoom = zoom_factor(
         ov.width.max(MIN_SIZE),
@@ -86,7 +84,6 @@ pub fn maximized_ids(app: &AppHandle) -> Vec<i64> {
         .unwrap_or_default()
 }
 
-/// Aufräumen, wenn ein Overlay-Fenster zerstört wurde.
 pub fn forget(app: &AppHandle, label: &str) {
     if let Some(id) = id_from_label(label) {
         let state = app.state::<AppState>();
@@ -128,15 +125,12 @@ pub fn apply_zoom(win: &WebviewWindow) {
     let _ = win.eval(format!("window.__overlaySetZoom&&window.__overlaySetZoom({zoom})"));
 }
 
-/// Für Window-Events (Resized): Zoom des zugehörigen Overlay-Fensters aktualisieren.
 pub fn apply_zoom_for(window: &Window) {
     if let Some(win) = window.app_handle().get_webview_window(window.label()) {
         apply_zoom(&win);
     }
 }
 
-/// Öffnet das Overlay-Fenster (oder zeigt es, falls schon vorhanden).
-/// Das Fenster hat NIE einen nativen Rahmen / eine Titelleiste.
 pub fn open(app: &AppHandle, ov: &Overlay) -> Result<(), String> {
     let label = label(ov.id);
     if let Some(w) = app.get_webview_window(&label) {
@@ -163,7 +157,6 @@ pub fn open(app: &AppHandle, ov: &Overlay) -> Result<(), String> {
         .visible(false) // erst nach Positionierung anzeigen
         .focused(false)
         .initialization_script(init_script(ov))
-        // Nach jedem (Re-)Load die aktuellen Werte aus der DB einspielen.
         .on_page_load(move |w, payload| {
             if matches!(payload.event(), PageLoadEvent::Finished) {
                 let app = w.app_handle();
@@ -255,7 +248,6 @@ pub fn set_maximized(win: &WebviewWindow, ov: &Overlay, on: bool) -> Result<(), 
     Ok(())
 }
 
-/// Gespeicherte Einstellungen live auf ein offenes Fenster anwenden (ohne Neuladen).
 pub fn sync(win: &WebviewWindow, ov: &Overlay) -> Result<(), String> {
     remember_base(win.app_handle(), ov);
     win.set_title(&ov.name).map_err(es)?;
@@ -267,7 +259,6 @@ pub fn sync(win: &WebviewWindow, ov: &Overlay) -> Result<(), String> {
     Ok(())
 }
 
-/// Seite neu laden (bei geänderter URL: neue Adresse laden).
 pub fn reload(win: &WebviewWindow, url: &str, url_changed: bool) {
     if url_changed {
         if let Ok(js) = serde_json::to_string(url) {

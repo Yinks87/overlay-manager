@@ -3,7 +3,6 @@ import { useMonitors } from "../hooks/useMonitors";
 import ScreenMap from "./ScreenMap";
 import OverlayContextMenu, { menuPosition } from "./OverlayContextMenu";
 
-/** Startseite: alle Monitore mit den Positionen der Overlays. */
 export default function DashboardPage({
   overlays,
   openIds,

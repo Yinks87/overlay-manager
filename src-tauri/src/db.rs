@@ -249,7 +249,6 @@ pub fn get(c: &Connection, id: i64) -> rusqlite::Result<Option<Overlay>> {
     .optional()
 }
 
-/// Nächste freie Position auf der obersten Ebene (Overlays ohne Gruppe und Gruppen teilen sich die Zählung).
 fn next_root_position(c: &Connection) -> rusqlite::Result<i64> {
     c.query_row(
         "SELECT COALESCE(MAX(p), -1) + 1 FROM
@@ -413,8 +412,6 @@ pub fn set_update_settings(
     )?;
     Ok(())
 }
-
-// ── Gruppen ──
 
 pub fn list_groups(c: &Connection) -> rusqlite::Result<Vec<Group>> {
     let mut st =

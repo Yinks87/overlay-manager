@@ -66,7 +66,6 @@ pub async fn create_overlay(state: State<'_, AppState>, input: OverlayInput) -> 
     fetch(&state, id)
 }
 
-/// Kopie eines Overlays mit allen Einstellungen (gesperrt, leicht versetzt, nicht geöffnet).
 #[tauri::command]
 pub async fn duplicate_overlay(state: State<'_, AppState>, id: i64) -> Res<Overlay> {
     let src = fetch(&state, id)?;
@@ -112,7 +111,6 @@ pub async fn update_overlay(
     let ov = fetch(&state, id)?;
     if let Some(win) = app.get_webview_window(&overlay::label(id)) {
         overlay::sync(&win, &ov)?;
-        // Gespeichert = sofort neu laden.
         overlay::reload(&win, &ov.url, old.url != ov.url);
     }
     Ok(ov)
@@ -245,7 +243,6 @@ pub async fn save_layout(state: State<'_, AppState>, layout: Vec<LayoutItem>) ->
     with_db(&state, |c| db::save_layout(c, &layout))
 }
 
-/// Mehrere Overlays auf einmal öffnen (aktivieren) oder schließen (deaktivieren).
 #[tauri::command]
 pub async fn set_overlays_open(
     app: AppHandle,
@@ -331,4 +328,3 @@ pub async fn toggle_overlay_maximized(
     overlay::set_maximized(&win, &ov, true)?;
     Ok(true)
 }
-

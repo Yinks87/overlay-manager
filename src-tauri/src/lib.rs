@@ -13,9 +13,7 @@ use tauri::{Emitter, Manager, WindowEvent};
 /// auf die DB zugreifen (Deadlock-Gefahr).
 pub struct AppState {
     pub db: Mutex<rusqlite::Connection>,
-    /// IDs der Overlays, die gerade auf Monitorgröße maximiert sind.
     pub maximized: Mutex<HashSet<i64>>,
-    /// Referenzgröße (100 % Zoom) der geöffneten Overlays: id → (Breite, Höhe).
     pub bases: Mutex<HashMap<i64, (u32, u32)>>,
 }
 
@@ -39,7 +37,6 @@ fn restore_dashboard(win: &tauri::WebviewWindow, g: db::DashboardGeometry) {
     }
 }
 
-/// Wird bei Moved/Resized des Hauptfensters aufgerufen (nie im Main-Thread blockieren).
 fn persist_dashboard(window: &tauri::Window) {
     if window.is_minimized().unwrap_or(false)
         || window.is_maximized().unwrap_or(false)
@@ -71,7 +68,6 @@ fn minimize_on_close(app: &tauri::AppHandle) -> bool {
 
 const TRAY_ID: &str = "main-tray";
 
-/// Dashboard wieder anzeigen und das Tray-Symbol ausblenden.
 fn show_dashboard(app: &tauri::AppHandle) {
     if let Some(main) = app.get_webview_window("main") {
         let _ = main.show();
@@ -83,7 +79,6 @@ fn show_dashboard(app: &tauri::AppHandle) {
     }
 }
 
-/// Dashboard ausblenden (weder Fenster noch Taskleiste) und Tray-Symbol zeigen.
 fn hide_to_tray(window: &tauri::Window) {
     let _ = window.hide();
     if let Some(tray) = window.app_handle().tray_by_id(TRAY_ID) {
@@ -177,7 +172,6 @@ pub fn run() {
                 restore_dashboard(&main, g);
             }
 
-            // Aktivierte Overlays direkt beim App-Start öffnen.
             for ov in autostart {
                 if let Err(e) = overlay::open(app.handle(), &ov) {
                     eprintln!("Overlay '{}' konnte nicht gestartet werden: {e}", ov.name);
@@ -197,7 +191,6 @@ pub fn run() {
                         window.app_handle().exit(0);
                     }
                 }
-                // Position/Größe des Dashboards speichern.
                 WindowEvent::Moved(_) | WindowEvent::Resized(_) if label == "main" => {
                     persist_dashboard(window);
                 }

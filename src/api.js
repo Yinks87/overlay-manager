@@ -1,4 +1,3 @@
-// Dünne Schicht über den Rust-Commands (src-tauri/src/commands.rs).
 import { invoke } from "@tauri-apps/api/core";
 
 export const api = {

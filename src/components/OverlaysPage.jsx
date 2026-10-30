@@ -2,7 +2,6 @@ import { useState } from "react";
 import OverlayList from "./OverlayList";
 import OverlayEditor from "./OverlayEditor";
 
-/** Gesamtes Overlay-Handling: Liste mit Gruppen (links) und Einstellungen des gewählten Overlays (rechts). */
 export default function OverlaysPage({ o, selectedId, onSelect }) {
   const [editGroupId, setEditGroupId] = useState(null);
   const selected = o.overlays.find((x) => x.id === selectedId) ?? null;

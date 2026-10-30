@@ -1,6 +1,3 @@
-// Listenstruktur: oberste Ebene = Overlays ohne Gruppe + Gruppen (mit ihren Overlays).
-// Sortierung identisch zum Backend (db.rs::delete_group): Position, Overlays vor Gruppen, id.
-
 export function buildTree(overlays, groups) {
   const groupIds = new Set(groups.map((g) => g.id));
   const byPosition = (a, b) => a.position - b.position || a.id - b.id;
@@ -83,7 +80,6 @@ export function applyMove(layout, drag, drop) {
     if (idx < 0) return null;
     next.splice(idx + after, 0, entry);
   } else {
-    // Ziel ist ein Overlay: auf oberster Ebene oder innerhalb einer Gruppe
     const rootIdx = next.findIndex((i) => i.type === "overlay" && i.id === drop.id);
     if (rootIdx >= 0) {
       next.splice(rootIdx + after, 0, entry);
@@ -100,7 +96,6 @@ export function applyMove(layout, drag, drop) {
   return next;
 }
 
-/** Überträgt eine Listenstruktur auf Overlays/Gruppen (Position und Gruppenzugehörigkeit). */
 export function applyLayoutToState(layout, overlays, groups) {
   const overlayInfo = new Map();
   const groupPos = new Map();
