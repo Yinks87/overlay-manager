@@ -53,7 +53,7 @@ Alle Daten (Overlays, Einstellungen) liegen in einer lokalen SQLite-Datei unter 
 - **Deadlock-Regel**: Beim Erweitern des Rust-Codes den DB-Lock nie während Fenster-Aufrufen halten.
 
 
-## 1. Voraussetzungen (Windows 10/11)
+## 1. Voraussetzungen (Windows 10/11) - NUR ENTWICKLUNG
 
 - [Node.js LTS](https://nodejs.org)
 - [Rust](https://rustup.rs) (`rustup default stable-msvc`)
